@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import auth
+from app.routers import auth, matches
 
 app = FastAPI(
     title="T20 DataHub API",
@@ -8,6 +8,7 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+app.include_router(matches.router)
 
 @app.get("/health", tags=["Health"])
 async def health():
