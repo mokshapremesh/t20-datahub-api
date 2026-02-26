@@ -12,3 +12,5 @@ class Base(DeclarativeBase):
 async def get_db():
     async with async_session() as session:
         yield session
+# alias so both names work
+get_session = get_db
