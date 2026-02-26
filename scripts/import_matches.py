@@ -1,5 +1,5 @@
 """
-Import T20 World Cup 2024 matches from Cricsheet JSON files.
+Import T20 World Cup matches (all years) from Cricsheet JSON files.
 Usage: PYTHONPATH=. python scripts/import_matches.py
 """
 import json
@@ -13,7 +13,6 @@ from app.models.match import Match
 from app.models.delivery import Delivery
 
 DATA_FOLDER = Path.home() / "Desktop" / "icc_mens_t20_world_cup_json"
-TARGET_YEAR = "2024"
 
 
 def parse_match(data: dict, file_id: str) -> dict | None:
@@ -24,9 +23,6 @@ def parse_match(data: dict, file_id: str) -> dict | None:
 
     raw_date = dates[0]
     match_date = date_type.fromisoformat(str(raw_date))
-
-    if not str(match_date).startswith(TARGET_YEAR):
-        return None
 
     teams = info.get("teams", [])
     outcome = info.get("outcome", {})
@@ -41,7 +37,7 @@ def parse_match(data: dict, file_id: str) -> dict | None:
         "team2":           teams[1] if len(teams) > 1 else None,
         "venue":           info.get("venue"),
         "winner":          winner,
-        "tournament_year": TARGET_YEAR,
+        "tournament_year": str(match_date.year),   # uses actual year, not hardcoded
         "stage":           info.get("event", {}).get("stage"),
         "toss_winner":     info.get("toss", {}).get("winner"),
         "toss_decision":   info.get("toss", {}).get("decision"),
@@ -59,7 +55,6 @@ def parse_deliveries(data: dict, match_id: int) -> list[dict]:
         teams = data["info"].get("teams", [])
         bowling_team = next((t for t in teams if t != batting_team), None)
 
-        # FIX: count ALL deliveries (legal + illegal) to guarantee uniqueness
         total_ball_count = 0
         legal_ball_count = 0
 
@@ -86,7 +81,6 @@ def parse_deliveries(data: dict, match_id: int) -> list[dict]:
                     elif "legbyes" in extras:
                         extras_type = "legbye"
 
-                # Always increment total counter — this is what makes ball_in_innings unique
                 total_ball_count += 1
 
                 if is_legal:
@@ -102,10 +96,6 @@ def parse_deliveries(data: dict, match_id: int) -> list[dict]:
                     "innings_number":   innings_num,
                     "batting_team":     batting_team,
                     "bowling_team":     bowling_team or "",
-                    # FIX: use total_ball_count (includes wides/noballs) so every
-                    # row has a unique value — legal_ball_count caused collisions
-                    # when a wide/noball was followed by a legal delivery in the
-                    # same over (both got the same legal_ball_count value).
                     "ball_in_innings":  total_ball_count,
                     "over":             over_num,
                     "ball_in_over":     legal_in_over if is_legal else 0,
@@ -145,7 +135,7 @@ async def import_all():
                     skipped += 1
                     continue
 
-                # Skip if match already fully imported
+                # Skip if match already imported
                 existing = await session.execute(
                     select(Match).where(Match.cricsheet_id == file_id)
                 )
@@ -158,8 +148,7 @@ async def import_all():
                 session.add(match)
                 await session.flush()
 
-                # Insert deliveries — ON CONFLICT DO NOTHING as a safety net
-                # (the real fix is ball_in_innings using total_ball_count above)
+                # Insert deliveries
                 delivery_rows = parse_deliveries(data, match.id)
                 if delivery_rows:
                     stmt = pg_insert(Delivery).values(delivery_rows)
@@ -170,7 +159,8 @@ async def import_all():
 
                 await session.commit()
                 print(f"  OK: {match_data['team1']} vs {match_data['team2']} "
-                      f"({match_data['match_date']}) — {len(delivery_rows)} deliveries")
+                      f"({match_data['match_date']}) [{match_data['tournament_year']}]"
+                      f" — {len(delivery_rows)} deliveries")
                 imported += 1
 
             except Exception as e:
