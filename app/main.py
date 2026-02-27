@@ -1,14 +1,19 @@
 from fastapi import FastAPI
-from app.routers import auth, matches
+from fastapi.security import HTTPBearer
+from app.routers import auth, matches, fantasy
+
+security = HTTPBearer()
 
 app = FastAPI(
     title="T20 DataHub API",
     description="T20 World Cup Analytics API — all tournaments 2014-2026",
     version="1.0.0",
+    swagger_ui_init_oauth={},
 )
 
 app.include_router(auth.router)
 app.include_router(matches.router)
+app.include_router(fantasy.router)
 
 @app.get("/health", tags=["Health"])
 async def health():
