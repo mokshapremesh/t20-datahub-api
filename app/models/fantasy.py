@@ -11,6 +11,7 @@ class FantasyTeam(Base):
     id          = Column(Integer, primary_key=True, index=True)
     user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
     team_name   = Column(String(100), nullable=False)
+    match_id    = Column(Integer, ForeignKey("matches.id"), nullable=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
     updated_at  = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -48,3 +49,4 @@ class FantasyEntry(Base):
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
 
     fantasy_team    = relationship("FantasyTeam", back_populates="entries")
+# Already in file — just verify match_id column exists on FantasyTeam
