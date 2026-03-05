@@ -14,7 +14,7 @@ from app.schemas.scorecard import (
     BattingRow, BowlingRow, ExtrasBreakdown, FallOfWicket, OverSummary
 )
 
-router = APIRouter(prefix="/matches", tags=["Matches"])
+router = APIRouter(prefix="/matches", tags=["Matches"])\nadmin_router = APIRouter(prefix="/matches", tags=["Admin - Matches"])
 
 
 # ── List Matches ──────────────────────────────────────────────────────────────
@@ -41,13 +41,23 @@ async def list_matches(
         query.order_by(Match.match_date.desc()).limit(limit).offset(offset)
     )).scalars().all()
 
+    returned = len(matches)
+    base = f"/matches?limit={limit}"
+    if team:  base += f"&team={team}"
+    if year:  base += f"&year={year}"
+    if stage: base += f"&stage={stage}"
+    if venue: base += f"&venue={venue}"
+    next_link = f"{base}&offset={offset + limit}" if returned == limit else None
+    prev_link = f"{base}&offset={max(offset - limit, 0)}" if offset > 0 else None
+
     return MatchListOut(
-        total=len(matches),
-        returned=len(matches),
+        total=returned,
+        returned=returned,
         limit=limit,
         offset=offset,
         filters=MatchFilters(team=team, year=year, stage=stage, venue=venue),
         matches=[MatchOut.model_validate(m) for m in matches],
+        links={"self": f"{base}&offset={offset}", "next": next_link, "prev": prev_link},
     )
 
 
@@ -230,7 +240,7 @@ async def get_scorecard(
 
 # ── Admin CUD ─────────────────────────────────────────────────────────────────
 
-@router.post("", status_code=201, response_model=MatchOut, tags=["Admin - Matches"])
+@admin_router.post("", status_code=201, response_model=MatchOut)
 async def create_match(
     body: MatchCreate,
     session: AsyncSession = Depends(get_session),
@@ -244,7 +254,7 @@ async def create_match(
     return MatchOut.model_validate(match)
 
 
-@router.patch("/{match_id}", response_model=MatchOut, tags=["Admin - Matches"])
+@admin_router.patch("/{match_id}", response_model=MatchOut)
 async def update_match(
     match_id: int,
     body: MatchUpdate,
@@ -262,7 +272,7 @@ async def update_match(
     return MatchOut.model_validate(match)
 
 
-@router.delete("/{match_id}", status_code=204, tags=["Admin - Matches"])
+@admin_router.delete("/{match_id}", status_code=204)
 async def delete_match(
     match_id: int,
     session: AsyncSession = Depends(get_session),
