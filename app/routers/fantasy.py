@@ -75,7 +75,7 @@ async def score_player(player_name, match_id, role, session):
     if runs == 0 and dismissed: bat_pts -= 5; bat_bonuses.append("duck (-5)")
 
     bowl = (await session.execute(select(
-        func.count(Delivery.id).filter(Delivery.is_wicket == True).label("wickets"),
+        func.count(Delivery.id).filter(Delivery.is_wicket == True, Delivery.wicket_type.isnot(None), ~func.lower(Delivery.wicket_type).in_({"run out", "retired hurt", "retired out", "obstructing the field", "hit the ball twice", "handled the ball", "timed out"})).label("wickets"),
         func.sum(Delivery.runs_total).label("runs_conceded"),
         func.count(Delivery.id).filter(Delivery.is_legal == True).label("balls_bowled"),
     ).where(Delivery.match_id == match_id, Delivery.bowler == player_name))).first()
@@ -134,7 +134,7 @@ async def get_match_players(match_key: str, session: AsyncSession = Depends(get_
     """STEP 2 — See all players + estimated points. Copy player_key to build XI."""
     match = await resolve_match_key(match_key, session)
     batters_q = (await session.execute(select(Delivery.batter, Delivery.batting_team, func.sum(Delivery.runs_batter).label("runs"), func.count(Delivery.id).filter(Delivery.is_legal == True).label("balls"), func.count(Delivery.id).filter(Delivery.runs_batter == 4).label("fours"), func.count(Delivery.id).filter(Delivery.runs_batter == 6).label("sixes"), func.count(Delivery.id).filter(Delivery.is_wicket == True).label("dismissed")).where(Delivery.match_id == match.id).group_by(Delivery.batter, Delivery.batting_team))).all()
-    bowlers_q = (await session.execute(select(Delivery.bowler, Delivery.bowling_team, func.count(Delivery.id).filter(Delivery.is_wicket == True).label("wickets"), func.sum(Delivery.runs_total).label("runs_conceded"), func.count(Delivery.id).filter(Delivery.is_legal == True).label("balls")).where(Delivery.match_id == match.id).group_by(Delivery.bowler, Delivery.bowling_team))).all()
+    bowlers_q = (await session.execute(select(Delivery.bowler, Delivery.bowling_team, func.count(Delivery.id).filter(Delivery.is_wicket == True, Delivery.wicket_type.isnot(None), ~func.lower(Delivery.wicket_type).in_({"run out", "retired hurt", "retired out", "obstructing the field", "hit the ball twice", "handled the ball", "timed out"})).label("wickets"), func.sum(Delivery.runs_total).label("runs_conceded"), func.count(Delivery.id).filter(Delivery.is_legal == True).label("balls")).where(Delivery.match_id == match.id).group_by(Delivery.bowler, Delivery.bowling_team))).all()
     player_map = {}
     for b in batters_q:
         runs = b.runs or 0; balls = b.balls or 1; fours = b.fours or 0; sixes = b.sixes or 0
