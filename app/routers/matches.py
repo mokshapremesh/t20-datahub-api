@@ -14,7 +14,8 @@ from app.schemas.scorecard import (
     BattingRow, BowlingRow, ExtrasBreakdown, FallOfWicket, OverSummary
 )
 
-router = APIRouter(prefix="/matches", tags=["Matches"])\nadmin_router = APIRouter(prefix="/matches", tags=["Admin - Matches"])
+router = APIRouter(prefix="/matches", tags=["Matches"])
+admin_router = APIRouter(prefix="/matches", tags=["Admin - Matches"])
 
 
 # ── List Matches ──────────────────────────────────────────────────────────────
