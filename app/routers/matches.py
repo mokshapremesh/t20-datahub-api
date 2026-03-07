@@ -23,7 +23,7 @@ admin_router = APIRouter(prefix="/matches", tags=["Admin - Matches"])
 @router.get("", response_model=MatchListOut)
 async def list_matches(
     team:   Optional[str] = Query(None, description="Filter by team name"),
-    year:   Optional[str] = Query(None, description="Tournament year e.g. 2024", pattern=r"^\\d{4}$"),
+    year:   Optional[str] = Query(None, description="Tournament year e.g. 2024", pattern=r"^\d{4}$"),
     stage:  Optional[str] = Query(None, description="e.g. Final, Semi Final, Group"),
     venue:  Optional[str] = Query(None, description="Venue name (partial match)"),
     limit:  int           = Query(50, ge=1, le=200),

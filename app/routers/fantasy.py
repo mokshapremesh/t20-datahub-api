@@ -103,7 +103,7 @@ async def score_player(player_name, match_id, role, session):
         "explain": f"Bat:{runs}r+{fours}x4+{sixes}x6={bat_pts}pts | Bowl:{wickets}w@{economy}={bowl_pts}pts | {base_points}x{multiplier}={final_points}pts",
     }
 
-@router.get("/match")
+@router.get("/match", include_in_schema=False)
 async def find_match(
     team1: Optional[str] = Query(None), team2: Optional[str] = Query(None),
     year: Optional[str] = Query(None), stage: Optional[str] = Query(None),
@@ -129,7 +129,7 @@ async def find_match(
         "matches": [{"match_key": make_match_key(m), "matchup": f"{m.team1} vs {m.team2}", "year": m.tournament_year, "date": str(m.match_date), "venue": m.venue, "stage": m.stage or "Group Stage"} for m in matches],
     }
 
-@router.get("/match/{match_key}/players")
+@router.get("/match/{match_key}/players", include_in_schema=False)
 async def get_match_players(match_key: str, session: AsyncSession = Depends(get_session)):
     """STEP 2 — See all players + estimated points. Copy player_key to build XI."""
     match = await resolve_match_key(match_key, session)
@@ -171,7 +171,7 @@ async def get_match_players(match_key: str, session: AsyncSession = Depends(get_
         },
     }
 
-@router.post("/teams", status_code=status.HTTP_201_CREATED)
+@router.post("/teams", include_in_schema=False, status_code=status.HTTP_201_CREATED)
 async def create_team(
     team_name: str = Form(..., description="e.g. My Dream XI"),
     match_key: str = Form(..., description="e.g. IND-ENG-2024-06-27-SF"),
@@ -183,7 +183,7 @@ async def create_team(
     session.add(team); await session.commit(); await session.refresh(team)
     return {"team_id": team.id, "team_name": team.team_name, "match_key": match_key, "match": f"{match.team1} vs {match.team2} ({match.tournament_year})", "players_added": 0, "next_steps": [f"POST /fantasy/teams/{team.id}/players?player_key=V_KOHLI  (x11)", f"PUT  /fantasy/teams/{team.id}/captain?player_key=V_KOHLI", f"PUT  /fantasy/teams/{team.id}/vice-captain?player_key=JJ_BUMRAH", f"GET  /fantasy/teams/{team.id}  <- verify"]}
 
-@router.post("/teams/{team_id}/players", status_code=status.HTTP_201_CREATED)
+@router.post("/teams/{team_id}/players", include_in_schema=False, status_code=status.HTTP_201_CREATED)
 async def add_player(
     team_id: int, player_key: str = Query(..., description="e.g. V_KOHLI"),
     session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user),
@@ -202,7 +202,7 @@ async def add_player(
     new_count = count + 1
     return {"added": player_name, "player_key": player_key, "players_added": new_count, "players_remaining": 11 - new_count, "message": f"✅ {player_name} added. {11-new_count} more to go." if new_count < 11 else "✅ XI complete! Set captain and vice captain."}
 
-@router.delete("/teams/{team_id}/players/{player_key:path}")
+@router.delete("/teams/{team_id}/players/{player_key:path}", include_in_schema=False)
 async def remove_player(team_id: int, player_key: str, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Remove a player from your XI"""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
@@ -214,7 +214,7 @@ async def remove_player(team_id: int, player_key: str, session: AsyncSession = D
     count = (await session.execute(select(func.count(FantasyTeamPlayer.id)).where(FantasyTeamPlayer.fantasy_team_id == team_id))).scalar() or 0
     return {"message": f"✅ {player_name} removed", "players_in_team": count}
 
-@router.put("/teams/{team_id}/captain")
+@router.put("/teams/{team_id}/captain", include_in_schema=False)
 async def set_captain(team_id: int, player_key: str = Query(..., description="e.g. V_KOHLI"), session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Set captain — 2x points"""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
@@ -228,7 +228,7 @@ async def set_captain(team_id: int, player_key: str = Query(..., description="e.
     new_c.role = "CAPTAIN"; await session.commit()
     return {"message": f"⭐ {player_name} is CAPTAIN (x2 points)"}
 
-@router.put("/teams/{team_id}/vice-captain")
+@router.put("/teams/{team_id}/vice-captain", include_in_schema=False)
 async def set_vice_captain(team_id: int, player_key: str = Query(..., description="e.g. JJ_BUMRAH"), session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Set vice captain — 1.5x points"""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
@@ -242,7 +242,7 @@ async def set_vice_captain(team_id: int, player_key: str = Query(..., descriptio
     new_vc.role = "VICE_CAPTAIN"; await session.commit()
     return {"message": f"🔵 {player_name} is VICE CAPTAIN (x1.5 points)"}
 
-@router.get("/teams")
+@router.get("/teams", include_in_schema=False)
 async def list_teams(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """List all your Fantasy XIs"""
     teams = (await session.execute(select(FantasyTeam).where(FantasyTeam.user_id == current_user.id).order_by(FantasyTeam.created_at.desc()))).scalars().all()
@@ -255,7 +255,7 @@ async def list_teams(session: AsyncSession = Depends(get_session), current_user:
         result.append({"team_id": t.id, "team_name": t.team_name, "match_key": make_match_key(match) if match else None, "players_added": len(players), "complete": len(players) == 11, "captain": captain or "Not set", "vice_captain": vc or "Not set", "ready": len(players) == 11 and bool(captain) and bool(vc)})
     return {"total": len(result), "teams": result}
 
-@router.get("/teams/{team_id}")
+@router.get("/teams/{team_id}", include_in_schema=False)
 async def get_team(team_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """View your XI — readiness check"""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
@@ -271,7 +271,7 @@ async def get_team(team_id: int, session: AsyncSession = Depends(get_session), c
     if not vc: warnings.append(f"Set vice captain -> PUT /fantasy/teams/{team_id}/vice-captain?player_key=...")
     return {"team_id": team.id, "team_name": team.team_name, "match_key": make_match_key(match) if match else None, "ready_to_submit": ready, "warnings": warnings, "captain": captain or "Not set", "vice_captain": vc or "Not set", "squad": [{"player_key": make_player_key(p.player_name), "player_name": p.player_name, "role": p.role} for p in players], "next_step": f"POST /fantasy/entries?fantasy_team_id={team_id}" if ready else "Complete XI first"}
 
-@router.put("/teams/{team_id}")
+@router.put("/teams/{team_id}", include_in_schema=False)
 async def rename_team(team_id: int, team_name: str = Form(...), session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Rename your Fantasy XI"""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
@@ -279,14 +279,14 @@ async def rename_team(team_id: int, team_name: str = Form(...), session: AsyncSe
     old = team.team_name; team.team_name = team_name.strip(); await session.commit()
     return {"message": f"Renamed '{old}' to '{team.team_name}'", "team_id": team_id}
 
-@router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/teams/{team_id}", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_team(team_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Delete your Fantasy XI"""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
     if not team: raise HTTPException(status_code=404, detail="Team not found")
     await session.delete(team); await session.commit()
 
-@router.post("/entries", status_code=status.HTTP_201_CREATED)
+@router.post("/entries", include_in_schema=False, status_code=status.HTTP_201_CREATED)
 async def create_entry(fantasy_team_id: int = Query(...), session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """STEP 4 — Enter your XI into the match."""
     team = (await session.execute(select(FantasyTeam).where(FantasyTeam.id == fantasy_team_id, FantasyTeam.user_id == current_user.id))).scalar_one_or_none()
@@ -304,7 +304,7 @@ async def create_entry(fantasy_team_id: int = Query(...), session: AsyncSession 
     vc = next((p.player_name for p in players if p.role == "VICE_CAPTAIN"), None)
     return {"entry_id": entry.id, "status": "DRAFT", "match": f"{match.team1} vs {match.team2} ({match.match_date})", "match_key": make_match_key(match), "fantasy_team": team.team_name, "captain": captain, "vice_captain": vc, "next_steps": [f"POST /fantasy/entries/{entry.id}/submit", f"DELETE /fantasy/entries/{entry.id} to withdraw"]}
 
-@router.post("/entries/{entry_id}/submit")
+@router.post("/entries/{entry_id}/submit", include_in_schema=False)
 async def submit_entry(entry_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Lock your entry. Then reveal to score."""
     entry = (await session.execute(select(FantasyEntry).where(FantasyEntry.id == entry_id, FantasyEntry.user_id == current_user.id))).scalar_one_or_none()
@@ -313,7 +313,7 @@ async def submit_entry(entry_id: int, session: AsyncSession = Depends(get_sessio
     entry.status = "SUBMITTED"; await session.commit()
     return {"entry_id": entry.id, "status": "SUBMITTED", "message": "Entry locked", "next_step": f"POST /fantasy/entries/{entry_id}/reveal"}
 
-@router.get("/entries")
+@router.get("/entries", include_in_schema=False)
 async def list_entries(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Your full entry history"""
     entries = (await session.execute(select(FantasyEntry).where(FantasyEntry.user_id == current_user.id).order_by(FantasyEntry.created_at.desc()))).scalars().all()
@@ -325,7 +325,7 @@ async def list_entries(session: AsyncSession = Depends(get_session), current_use
     revealed = [e for e in entries if e.status == "REVEALED"]
     return {"total_entries": len(entries), "revealed": len(revealed), "best_score": max((e.total_points for e in revealed if e.total_points), default=None), "entries": result}
 
-@router.get("/entries/{entry_id}")
+@router.get("/entries/{entry_id}", include_in_schema=False)
 async def get_entry(entry_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """View entry — breakdown shown if revealed"""
     entry = (await session.execute(select(FantasyEntry).where(FantasyEntry.id == entry_id, FantasyEntry.user_id == current_user.id))).scalar_one_or_none()
@@ -337,7 +337,7 @@ async def get_entry(entry_id: int, session: AsyncSession = Depends(get_session),
         response["actual_winner"] = match.winner; response["breakdown"] = entry.breakdown
     return response
 
-@router.put("/entries/{entry_id}")
+@router.put("/entries/{entry_id}", include_in_schema=False)
 async def update_entry(entry_id: int, fantasy_team_id: int = Query(...), session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Swap fantasy team — only while DRAFT"""
     entry = (await session.execute(select(FantasyEntry).where(FantasyEntry.id == entry_id, FantasyEntry.user_id == current_user.id))).scalar_one_or_none()
@@ -348,7 +348,7 @@ async def update_entry(entry_id: int, fantasy_team_id: int = Query(...), session
     entry.fantasy_team_id = fantasy_team_id; await session.commit()
     return {"message": f"Swapped to '{new_team.team_name}'", "entry_id": entry_id}
 
-@router.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/entries/{entry_id}", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_entry(entry_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Withdraw entry — only before reveal"""
     entry = (await session.execute(select(FantasyEntry).where(FantasyEntry.id == entry_id, FantasyEntry.user_id == current_user.id))).scalar_one_or_none()
@@ -356,7 +356,7 @@ async def delete_entry(entry_id: int, session: AsyncSession = Depends(get_sessio
     if entry.status == "REVEALED": raise HTTPException(status_code=400, detail="Cannot delete a revealed entry")
     await session.delete(entry); await session.commit()
 
-@router.post("/entries/{entry_id}/reveal")
+@router.post("/entries/{entry_id}/reveal", include_in_schema=False)
 async def reveal_entry(entry_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     """FLAGSHIP — Score your XI from ball-by-ball data. Captain 2x. Vice 1.5x."""
     entry = (await session.execute(select(FantasyEntry).where(FantasyEntry.id == entry_id, FantasyEntry.user_id == current_user.id))).scalar_one_or_none()
@@ -382,7 +382,7 @@ async def reveal_entry(entry_id: int, session: AsyncSession = Depends(get_sessio
     pretty.append(f"TOTAL: {total_points} pts | Rank #{rank} of {len(others)+1}")
     return {"entry_id": entry.id, "match": f"{match.team1} vs {match.team2} ({match.match_date})", "match_key": make_match_key(match), "actual_winner": match.winner, "fantasy_team": team.team_name if team else None, "status": "REVEALED", "total_points": total_points, "rank_global": rank, "total_entries_this_match": len(others) + 1, "breakdown": breakdown, "pretty_summary": pretty}
 
-@router.get("/leaderboard/{match_key}")
+@router.get("/leaderboard_old/{match_key}", include_in_schema=False)
 async def match_leaderboard(match_key: str, limit: int = Query(10), session: AsyncSession = Depends(get_session)):
     """Leaderboard for a specific match"""
     match = await resolve_match_key(match_key, session)
@@ -394,7 +394,7 @@ async def match_leaderboard(match_key: str, limit: int = Query(10), session: Asy
         board.append({"rank": i+1, "username": user.username if user else "Unknown", "fantasy_team": team.team_name if team else None, "total_points": e.total_points})
     return {"match_key": match_key, "match": f"{match.team1} vs {match.team2} ({match.match_date})", "actual_winner": match.winner, "total_entries": len(entries), "leaderboard": board}
 
-@router.get("/leaderboard")
+@router.get("/leaderboard_old", include_in_schema=False)
 async def global_leaderboard(year: Optional[str] = Query(None), limit: int = Query(10), session: AsyncSession = Depends(get_session)):
     """Global top scores across all matches"""
     entries = (await session.execute(select(FantasyEntry).where(FantasyEntry.status == "REVEALED").order_by(FantasyEntry.total_points.desc()))).scalars().all()

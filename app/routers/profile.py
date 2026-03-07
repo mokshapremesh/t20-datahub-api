@@ -78,15 +78,23 @@ def _profile_dict(p: FanProfile) -> dict:
 
 # ── Profile CRUD ──────────────────────────────────────────────────────────────
 
-@router.post("/profile", status_code=201)
-async def create_profile(body: ProfileCreate, response: Response, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+@router.post("/profile", status_code=201, include_in_schema=False)
+async def create_profile(
+    response: Response,
+    display_name:   Optional[str] = Query(None, description="Your display name"),
+    fav_team:       Optional[str] = Query(None, description="Favourite team e.g. India"),
+    fav_player_key: Optional[str] = Query(None, description="Favourite player key e.g. V Kohli"),
+    fav_year:       Optional[str] = Query(None, description="Favourite tournament year e.g. 2024"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     """Create profile — fails if already exists. Use PUT to upsert."""
     existing = (await session.execute(select(FanProfile).where(FanProfile.user_id == current_user.id))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="Profile exists. Use PUT /me/profile to replace.")
-    if body.fav_team:       await validate_team(body.fav_team, session)
-    if body.fav_player_key: await validate_player(body.fav_player_key, session)
-    profile = FanProfile(user_id=current_user.id, display_name=body.display_name, fav_team=body.fav_team, fav_player_key=body.fav_player_key, fav_year=body.fav_year)
+    if fav_team:       await validate_team(fav_team, session)
+    if fav_player_key: await validate_player(fav_player_key, session)
+    profile = FanProfile(user_id=current_user.id, display_name=display_name, fav_team=fav_team, fav_player_key=fav_player_key, fav_year=fav_year)
     session.add(profile)
     await session.commit()
     await session.refresh(profile)
@@ -94,19 +102,26 @@ async def create_profile(body: ProfileCreate, response: Response, session: Async
     return {"message": "Profile created", "profile": _profile_dict(profile), "links": {"self": "/me/profile", "dashboard": "/me/dashboard"}}
 
 @router.put("/profile")
-async def upsert_profile(body: ProfileCreate, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+async def upsert_profile(
+    display_name:   Optional[str] = Query(None, description="Your display name"),
+    fav_team:       Optional[str] = Query(None, description="Favourite team e.g. India"),
+    fav_player_key: Optional[str] = Query(None, description="Favourite player key e.g. V Kohli"),
+    fav_year:       Optional[str] = Query(None, description="Favourite tournament year e.g. 2024"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     """Upsert — creates if not exists (201), replaces if exists (200)."""
-    if body.fav_team:       await validate_team(body.fav_team, session)
-    if body.fav_player_key: await validate_player(body.fav_player_key, session)
+    if fav_team:       await validate_team(fav_team, session)
+    if fav_player_key: await validate_player(fav_player_key, session)
     profile = (await session.execute(select(FanProfile).where(FanProfile.user_id == current_user.id))).scalar_one_or_none()
     created = profile is None
     if created:
         profile = FanProfile(user_id=current_user.id)
         session.add(profile)
-    profile.display_name   = body.display_name
-    profile.fav_team       = body.fav_team
-    profile.fav_player_key = body.fav_player_key
-    profile.fav_year       = body.fav_year
+    profile.display_name   = display_name
+    profile.fav_team       = fav_team
+    profile.fav_player_key = fav_player_key
+    profile.fav_year       = fav_year
     await session.commit()
     await session.refresh(profile)
     from fastapi.responses import JSONResponse
@@ -115,16 +130,23 @@ async def upsert_profile(body: ProfileCreate, session: AsyncSession = Depends(ge
         content={"message": "Profile created" if created else "Profile updated", "profile": _profile_dict(profile), "links": {"self": "/me/profile", "dashboard": "/me/dashboard"}}
     )
 
-@router.patch("/profile", status_code=200)
-async def patch_profile(body: ProfileUpdate, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+@router.patch("/profile", status_code=200, include_in_schema=False)
+async def patch_profile(
+    display_name:   Optional[str] = Query(None, description="Update display name"),
+    fav_team:       Optional[str] = Query(None, description="Update favourite team"),
+    fav_player_key: Optional[str] = Query(None, description="Update favourite player key"),
+    fav_year:       Optional[str] = Query(None, description="Update favourite year"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     """Partial update — only provided fields are changed."""
     profile = (await session.execute(select(FanProfile).where(FanProfile.user_id == current_user.id))).scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="No profile found. Use PUT /me/profile first.")
-    if body.fav_team       is not None: await validate_team(body.fav_team, session);         profile.fav_team       = body.fav_team
-    if body.fav_player_key is not None: await validate_player(body.fav_player_key, session); profile.fav_player_key = body.fav_player_key
-    if body.display_name   is not None: profile.display_name = body.display_name
-    if body.fav_year       is not None: profile.fav_year     = body.fav_year
+    if fav_team       is not None: await validate_team(fav_team, session);         profile.fav_team       = fav_team
+    if fav_player_key is not None: await validate_player(fav_player_key, session); profile.fav_player_key = fav_player_key
+    if display_name   is not None: profile.display_name = display_name
+    if fav_year       is not None: profile.fav_year     = fav_year
     await session.commit()
     await session.refresh(profile)
     return {"message": "Profile updated", "profile": _profile_dict(profile), "links": {"self": "/me/profile", "dashboard": "/me/dashboard"}}
@@ -390,10 +412,14 @@ async def get_players(
 
     bowl_q = select(
         Delivery.bowler.label("player"),
+        Delivery.bowling_team.label("team"),
         func.count(Delivery.id).filter(*bowler_wicket_filter()).label("wickets"),
         func.sum(Delivery.runs_total).label("runs_conceded"),
         func.count(Delivery.id).filter(Delivery.is_legal == True).label("balls")
-    ).where(Delivery.match_id.in_(match_ids)).group_by(Delivery.bowler)
+    ).where(Delivery.match_id.in_(match_ids)).group_by(Delivery.bowler, Delivery.bowling_team)
+    if team:
+        bat_q  = bat_q.where(Delivery.batting_team == team)
+        bowl_q = bowl_q.where(Delivery.bowling_team == team)
 
     if search:
         bat_q  = bat_q.where(Delivery.batter.ilike(f"%{search}%"))
@@ -411,8 +437,9 @@ async def get_players(
         if b.player in player_map:
             player_map[b.player]["wickets"] = b.wickets or 0
             player_map[b.player]["economy"] = economy
+            if not player_map[b.player]["team"]: player_map[b.player]["team"] = b.team
         else:
-            player_map[b.player] = {"player_key": b.player, "name": b.player, "team": None, "runs": 0, "strike_rate": 0.0, "fours": 0, "sixes": 0, "wickets": b.wickets or 0, "economy": economy}
+            player_map[b.player] = {"player_key": b.player, "name": b.player, "team": b.team, "runs": 0, "strike_rate": 0.0, "fours": 0, "sixes": 0, "wickets": b.wickets or 0, "economy": economy}
 
     players   = sorted(player_map.values(), key=lambda x: x["runs"] + x["wickets"] * 25, reverse=True)
     paginated = players[offset: offset + limit]
