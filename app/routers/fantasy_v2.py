@@ -236,18 +236,6 @@ async def create_team(
     return await _to_out(team, False, session)
 
 
-@teams_router.get("/fantasy/teams/{team_id}", response_model=FantasyTeamOut)
-async def get_team(
-    team_id: int,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get your fantasy team."""
-    team = (await _load_team_owned(team_id, current_user.id, session))
-    if not team: raise HTTPException(status_code=404, detail="Team not found")
-    return await _to_out(team, _is_locked(team, session))
-
-
 @teams_router.put("/fantasy/teams/{team_id}/captain", response_model=FantasyTeamOut)
 async def set_captain(
     team_id: int,
@@ -294,6 +282,18 @@ async def set_vice_captain(
     await session.commit()
     await session.refresh(team)
     return await _to_out(team, False, session)
+
+
+@teams_router.get("/fantasy/teams/{team_id}", response_model=FantasyTeamOut)
+async def get_team(
+    team_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Get your fantasy team."""
+    team = (await _load_team_owned(team_id, current_user.id, session))
+    if not team: raise HTTPException(status_code=404, detail="Team not found")
+    return await _to_out(team, _is_locked(team, session))
 
 
 @teams_router.delete("/fantasy/teams/{team_id}", status_code=204)
