@@ -26,8 +26,6 @@ async def list_matches(
     year:   Optional[str] = Query(None, description="Tournament year e.g. 2024", pattern=r"^\d{4}$"),
     stage:  Optional[str] = Query(None, description="e.g. Final, Semi Final, Group"),
     venue:  Optional[str] = Query(None, description="Venue name (partial match)"),
-    limit:  int           = Query(50, ge=1, le=200),
-    offset: int           = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ):
     """List matches with optional filters and pagination."""
@@ -39,26 +37,16 @@ async def list_matches(
 
     total_q = query
     matches = (await session.execute(
-        query.order_by(Match.match_date.desc()).limit(limit).offset(offset)
+        query.order_by(Match.match_date.desc())
     )).scalars().all()
 
     returned = len(matches)
-    base = f"/matches?limit={limit}"
-    if team:  base += f"&team={team}"
-    if year:  base += f"&year={year}"
-    if stage: base += f"&stage={stage}"
-    if venue: base += f"&venue={venue}"
-    next_link = f"{base}&offset={offset + limit}" if returned == limit else None
-    prev_link = f"{base}&offset={max(offset - limit, 0)}" if offset > 0 else None
 
     return MatchListOut(
         total=returned,
         returned=returned,
-        limit=limit,
-        offset=offset,
         filters=MatchFilters(team=team, year=year, stage=stage, venue=venue),
         matches=[MatchOut.model_validate(m) for m in matches],
-        links={"self": f"{base}&offset={offset}", "next": next_link, "prev": prev_link},
     )
 
 
@@ -75,7 +63,7 @@ async def get_match(match_id: int, session: AsyncSession = Depends(get_session))
 
 # ── Scorecard ─────────────────────────────────────────────────────────────────
 
-@router.get("/{match_id}/scorecard", response_model=ScorecardOut, tags=["Scorecard"])
+@router.get("/{match_id}/scorecard", response_model=ScorecardOut, tags=["Matches"])
 async def get_scorecard(
     match_id: int,
     include: Optional[str] = Query(None, description="Comma-separated extras: overs,fow"),

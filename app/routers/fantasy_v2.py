@@ -369,7 +369,7 @@ async def match_leaderboard(
     for i, e in enumerate(entries):
         user = await session.get(User, e.user_id)
         ft   = await session.get(FantasyTeam, e.fantasy_team_id)
-        board.append(LeaderboardEntry(rank=offset+i+1, username=user.username if user else "?",
+        board.append(LeaderboardEntry(rank=i+1, username=user.username if user else "?",
                                       team_name=ft.team_name if ft else "—", total_points=e.total_points, breakdown=e.breakdown))
     return LeaderboardOut(match_id=match_id, year=match.tournament_year, total=len(board), returned=len(board), leaderboard=board)
 
@@ -377,8 +377,6 @@ async def match_leaderboard(
 @lb_router.get("/fantasy/leaderboard", response_model=LeaderboardOut)
 async def global_leaderboard(
     year:   Optional[str] = Query(None, description="Tournament year e.g. 2024"),
-    limit:  int           = Query(50, ge=1, le=200),
-    offset: int           = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ):
     """Global leaderboard across all matches."""
@@ -386,11 +384,11 @@ async def global_leaderboard(
     if year:
         mids = (await session.execute(select(Match.id).where(Match.tournament_year == year))).scalars().all()
         q = q.where(FantasyEntry.match_id.in_(mids))
-    entries = (await session.execute(q.order_by(FantasyEntry.total_points.desc()).limit(limit).offset(offset))).scalars().all()
+    entries = (await session.execute(q.order_by(FantasyEntry.total_points.desc()))).scalars().all()
     board = []
     for i, e in enumerate(entries):
         user = await session.get(User, e.user_id)
         ft   = await session.get(FantasyTeam, e.fantasy_team_id)
-        board.append(LeaderboardEntry(rank=offset+i+1, username=user.username if user else "?",
+        board.append(LeaderboardEntry(rank=i+1, username=user.username if user else "?",
                                       team_name=ft.team_name if ft else "—", total_points=e.total_points))
     return LeaderboardOut(year=year, total=len(board), returned=len(board), leaderboard=board)

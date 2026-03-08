@@ -386,8 +386,6 @@ async def get_players(
     team:    Optional[str] = Query(None),
     year:    Optional[str] = Query(None),
     search:  Optional[str] = Query(None, description="Fuzzy name search"),
-    limit:   int           = Query(200, ge=1, le=500),
-    offset:  int           = Query(0,   ge=0),
     session: AsyncSession  = Depends(get_session)
 ):
     """
@@ -441,14 +439,10 @@ async def get_players(
         else:
             player_map[b.player] = {"player_key": b.player, "name": b.player, "team": b.team, "runs": 0, "strike_rate": 0.0, "fours": 0, "sixes": 0, "wickets": b.wickets or 0, "economy": economy}
 
-    players   = sorted(player_map.values(), key=lambda x: x["runs"] + x["wickets"] * 25, reverse=True)
-    paginated = players[offset: offset + limit]
+    players = sorted(player_map.values(), key=lambda x: x["runs"] + x["wickets"] * 25, reverse=True)
     return {
         "total":    len(players),
-        "returned": len(paginated),
-        "offset":   offset,
-        "limit":    limit,
         "filters":  {"team": team, "year": year, "search": search},
         "note":     "Use player_key exactly as shown when setting fav_player_key in your profile.",
-        "players":  paginated
+        "players":  players
     }
