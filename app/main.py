@@ -13,9 +13,9 @@ app = FastAPI(
         {"name": "Matches"},
         {"name": "Admin - Matches"},
         {"name": "Fan Profile & Dashboard"},
+        {"name": "Match Squads"},
         {"name": "Fantasy Teams"},
         {"name": "Fantasy Leaderboards"},
-        {"name": "Match Squads"},
     ]
 )
 
