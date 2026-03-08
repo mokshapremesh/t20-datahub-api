@@ -5,9 +5,31 @@ from app.routers.profile import options_router
 from app.routers.fantasy_v2 import teams_router, lb_router, squad_router
 
 app = FastAPI(
+
     title="T20 DataHub API",
+
     description="T20 World Cup Season Challenge — 2014-2026",
+
     version="2.0.0",
+
+    openapi_tags=[
+
+        {"name": "Auth"},
+
+        {"name": "Matches"},
+
+        {"name": "Admin - Matches"},
+
+        {"name": "Match Squads"},
+
+        {"name": "Fan Profile & Dashboard"},
+
+        {"name": "Fantasy Teams"},
+
+        {"name": "Fantasy Leaderboards"},
+
+    ]
+
 )
 
 app.include_router(auth.router)
