@@ -352,8 +352,6 @@ async def submit_team(
 @lb_router.get("/matches/{match_id}/fantasy/leaderboard", response_model=LeaderboardOut)
 async def match_leaderboard(
     match_id: int,
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ):
     """Ranked leaderboard of submitted teams for a match."""
@@ -363,7 +361,7 @@ async def match_leaderboard(
     entries = (await session.execute(
         select(FantasyEntry)
         .where(FantasyEntry.match_id == match_id, FantasyEntry.status == "SUBMITTED")
-        .order_by(FantasyEntry.total_points.desc()).limit(limit).offset(offset)
+        .order_by(FantasyEntry.total_points.desc())
     )).scalars().all()
     board = []
     for i, e in enumerate(entries):

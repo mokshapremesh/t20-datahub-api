@@ -350,7 +350,7 @@ async def get_dashboard(session: AsyncSession = Depends(get_session), current_us
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
-options_router = APIRouter(prefix="/options", tags=["Options & Dropdowns"])
+options_router = APIRouter(prefix="/options", tags=["Matches"])
 
 @options_router.get("/teams")
 async def get_teams(year: Optional[str] = Query(None), session: AsyncSession = Depends(get_session)):
@@ -379,7 +379,20 @@ async def get_teams(year: Optional[str] = Query(None), session: AsyncSession = D
          "win_rate": round(s["wins"] / max(s["wins"] + s["losses"], 1) * 100, 1)}
         for t, s in team_stats.items()
     ], key=lambda x: x["matches"], reverse=True)
-    return {"total": len(teams), "filter": {"year": year}, "teams": teams}
+    # Find tournament winner (team that won the Final)
+    tournament_winner = None
+    if year:
+        final = (await session.execute(
+            select(Match.winner)
+            .where(Match.tournament_year == year)
+            .where(Match.stage.ilike("%final%"))
+            .where(Match.stage.notilike("%semi%"))
+            .order_by(Match.match_date.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        tournament_winner = final
+
+    return {"total": len(teams), "filter": {"year": year}, "tournament_winner": tournament_winner, "teams": teams}
 
 @options_router.get("/players")
 async def get_players(

@@ -4,6 +4,12 @@ from datetime import date, datetime
 import re
 
 
+class InningsScore(BaseModel):
+    team: str
+    runs: int
+    wickets: int
+    overs: str
+
 class MatchOut(BaseModel):
     id: int
     cricsheet_id: Optional[str] = None
@@ -15,6 +21,7 @@ class MatchOut(BaseModel):
     tournament_year: Optional[str] = None
     winner: Optional[str] = None
     toss_winner: Optional[str] = None
+    innings_scores: Optional[list[InningsScore]] = None
 
     model_config = {
         "from_attributes": True,
@@ -37,6 +44,7 @@ class MatchOut(BaseModel):
 
 class MatchFilters(BaseModel):
     team: Optional[str] = None
+    team2: Optional[str] = None
     year: Optional[str] = None
     stage: Optional[str] = None
     venue: Optional[str] = None
@@ -45,30 +53,10 @@ class MatchFilters(BaseModel):
 class MatchListOut(BaseModel):
     total: int
     returned: int
-    limit: int
-    offset: int
     filters: MatchFilters
     matches: list[MatchOut]
-    links: Optional[dict] = None
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "total": 2,
-                "returned": 2,
-                "limit": 50,
-                "offset": 0,
-                "filters": {"team": "India", "year": "2022", "stage": None, "venue": None},
-                "matches": [
-                    {"id": 198, "team1": "India", "team2": "South Africa",
-                     "match_date": "2022-10-30", "venue": "Perth Stadium",
-                     "stage": "Group", "tournament_year": "2022",
-                     "winner": "India", "toss_winner": "South Africa",
-                     "cricsheet_id": "1298175"}
-                ]
-            }
-        }
-    }
+    limit: int = 1000
+    offset: int = 0
 
 
 class MatchCreate(BaseModel):

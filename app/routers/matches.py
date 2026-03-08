@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_, cast, Integer, cast, Integer
 from typing import Optional
 from datetime import datetime
 from app.db.session import get_session
@@ -8,7 +8,7 @@ from app.models.match import Match
 from app.models.delivery import Delivery
 from app.models.user import User
 from app.services.auth import get_current_user, get_admin_user
-from app.schemas.matches import MatchOut, MatchListOut, MatchFilters, MatchCreate, MatchUpdate
+from app.schemas.matches import MatchOut, MatchListOut, MatchFilters, MatchCreate, MatchUpdate, InningsScore
 from app.schemas.scorecard import (
     ScorecardOut, ScorecardMatchHeader, InningsCard, InningsSummary,
     BattingRow, BowlingRow, ExtrasBreakdown, FallOfWicket, OverSummary
@@ -22,37 +22,83 @@ admin_router = APIRouter(prefix="/matches", tags=["Admin - Matches"])
 
 @router.get("", response_model=MatchListOut)
 async def list_matches(
-    team:   Optional[str] = Query(None, description="Filter by team name"),
+    team:   Optional[str] = Query(None, description="Team 1 name e.g. India"),
+    team2:  Optional[str] = Query(None, description="Team 2 name — use with team to find head-to-head matches"),
     year:   Optional[str] = Query(None, description="Tournament year e.g. 2024", pattern=r"^\d{4}$"),
     stage:  Optional[str] = Query(None, description="e.g. Final, Semi Final, Group"),
     venue:  Optional[str] = Query(None, description="Venue name (partial match)"),
     session: AsyncSession = Depends(get_session),
 ):
-    """List matches with optional filters and pagination."""
+    """List matches with optional filters. Use team + team2 for head-to-head."""
     query = select(Match)
-    if team:  query = query.where((Match.team1.ilike(f"%{team}%")) | (Match.team2.ilike(f"%{team}%")))
+    if team and team2:
+        query = query.where(
+            or_(
+                and_(Match.team1 == team, Match.team2 == team2),
+                and_(Match.team1 == team2, Match.team2 == team)
+            )
+        )
+    elif team:
+        query = query.where(or_(Match.team1.ilike(f"%{team}%"), Match.team2.ilike(f"%{team}%")))
     if year:  query = query.where(Match.tournament_year == year)
     if stage: query = query.where(Match.stage.ilike(f"%{stage}%"))
     if venue: query = query.where(Match.venue.ilike(f"%{venue}%"))
 
-    total_q = query
     matches = (await session.execute(
-        query.order_by(Match.match_date.desc())
+        query.order_by(Match.match_date.desc()).limit(1000)
     )).scalars().all()
 
-    returned = len(matches)
+    # Compute innings scores for each match
+    match_ids = [m.id for m in matches]
+    deliveries = (await session.execute(
+        select(
+            Delivery.match_id,
+            Delivery.innings_number,
+            Delivery.batting_team,
+            func.sum(Delivery.runs_total).label("runs"),
+            func.sum(cast(Delivery.is_wicket, Integer)).label("wickets"),
+            func.sum(cast(Delivery.is_legal, Integer)).label("legal_balls"),
+        )
+        .where(Delivery.match_id.in_(match_ids))
+        .group_by(Delivery.match_id, Delivery.innings_number, Delivery.batting_team)
+    )).all()
+
+    # Group by match_id
+    scores_map: dict = {}
+    for row in deliveries:
+        scores_map.setdefault(row.match_id, []).append(row)
+
+    def build_scores(match_id):
+        rows = scores_map.get(match_id, [])
+        result = []
+        for row in sorted(rows, key=lambda r: r.innings_number):
+            legal = int(row.legal_balls or 0)
+            overs = f"{legal // 6}.{legal % 6}"
+            result.append(InningsScore(
+                team=row.batting_team,
+                runs=int(row.runs or 0),
+                wickets=int(row.wickets or 0),
+                overs=overs,
+            ))
+        return result or None
+
+    out_matches = []
+    for m in matches:
+        d = MatchOut.model_validate(m)
+        d.innings_scores = build_scores(m.id)
+        out_matches.append(d)
 
     return MatchListOut(
-        total=returned,
-        returned=returned,
-        filters=MatchFilters(team=team, year=year, stage=stage, venue=venue),
-        matches=[MatchOut.model_validate(m) for m in matches],
+        total=len(matches),
+        returned=len(matches),
+        filters=MatchFilters(team=team, team2=team2, year=year, stage=stage, venue=venue),
+        matches=out_matches,
     )
 
 
 # ── Get Match ─────────────────────────────────────────────────────────────────
 
-@router.get("/{match_id}", response_model=MatchOut)
+@router.get("/{match_id}", response_model=MatchOut, include_in_schema=False)
 async def get_match(match_id: int, session: AsyncSession = Depends(get_session)):
     """Get a single match by ID."""
     match = (await session.execute(select(Match).where(Match.id == match_id))).scalar_one_or_none()
