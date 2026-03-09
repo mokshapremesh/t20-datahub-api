@@ -1,8 +1,14 @@
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from fastapi import FastAPI
 from app.routers import auth, matches, fantasy, profile
 from app.routers.matches import admin_router as matches_admin_router
 from app.routers.profile import options_router
 from app.routers.fantasy_v2 import teams_router, lb_router, squad_router
+
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="T20 DataHub API",
@@ -18,6 +24,9 @@ app = FastAPI(
         {"name": "Fantasy Leaderboards"},
     ]
 )
+
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(auth.router)
 app.include_router(matches.router)

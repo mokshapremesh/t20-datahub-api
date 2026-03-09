@@ -1,7 +1,10 @@
 import pytest
+import time
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.pool import NullPool
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+import os
+os.environ["TESTING"] = "1"
 from app.main import app
 from app.db.session import get_session
 from app.config import settings
@@ -29,14 +32,18 @@ async def client():
 
 @pytest.fixture()
 async def auth_headers(client):
+    uid = str(int(time.time() * 1000))
+    username = f"testuser_{uid}"
+    email = f"test_{uid}@test.com"
     await client.post("/auth/register", json={
-        "username": "testuser_suite",
-        "email": "suite@test.com",
-        "password": "Test1234!"
+        "username": username,
+        "email": email,
+        "password": "TestPass1234!"
     })
     resp = await client.post("/auth/login", data={
-        "username": "testuser_suite",
-        "password": "Test1234!"
+        "username": username,
+        "password": "TestPass1234!"
     })
+    assert resp.status_code == 200, f"Login failed: {resp.text}"
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

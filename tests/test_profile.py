@@ -28,6 +28,7 @@ async def test_get_profile_unauthenticated(client):
     assert resp.status_code == 401
 
 async def test_get_dashboard(client, auth_headers):
+    await client.put("/me/profile?display_name=TestUser", headers=auth_headers)
     resp = await client.get("/me/dashboard", headers=auth_headers)
     assert resp.status_code == 200
 

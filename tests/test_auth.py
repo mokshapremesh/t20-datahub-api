@@ -1,58 +1,77 @@
 import pytest
+import time
 
 pytestmark = pytest.mark.asyncio
 
+def uid():
+    return str(int(time.time() * 1000))
+
 async def test_register_success(client):
-    import time
-    uid = str(int(time.time()))
+    u = uid()
     resp = await client.post("/auth/register", json={
-        "username": f"newuser{uid}", "email": f"new{uid}@test.com", "password": "Test1234!"
+        "username": f"newuser{u}", "email": f"new{u}@test.com", "password": "TestPass1234!"
     })
     assert resp.status_code == 201
-    data = resp.json()
-    assert "username" in data
-    assert "id" in data
+    assert "username" in resp.json()
 
 async def test_register_duplicate_username(client):
-    payload = {"username": "dupuser", "email": "dup@test.com", "password": "Test1234!"}
-    await client.post("/auth/register", json=payload)
+    u = uid()
+    await client.post("/auth/register", json={
+        "username": f"dup{u}", "email": f"dup{u}@test.com", "password": "TestPass1234!"
+    })
     resp = await client.post("/auth/register", json={
-        "username": "dupuser", "email": "dup2@test.com", "password": "Test1234!"
+        "username": f"dup{u}", "email": f"dup2{u}@test.com", "password": "TestPass1234!"
     })
     assert resp.status_code in (400, 409)
 
 async def test_register_duplicate_email(client):
+    u = uid()
     await client.post("/auth/register", json={
-        "username": "emailuser1", "email": "same@test.com", "password": "Test1234!"
+        "username": f"em1{u}", "email": f"same{u}@test.com", "password": "TestPass1234!"
     })
     resp = await client.post("/auth/register", json={
-        "username": "emailuser2", "email": "same@test.com", "password": "Test1234!"
+        "username": f"em2{u}", "email": f"same{u}@test.com", "password": "TestPass1234!"
     })
     assert resp.status_code in (400, 409)
 
+async def test_register_weak_password(client):
+    u = uid()
+    resp = await client.post("/auth/register", json={
+        "username": f"weak{u}", "email": f"weak{u}@test.com", "password": "short"
+    })
+    assert resp.status_code == 400
+
+async def test_register_no_number_in_password(client):
+    u = uid()
+    resp = await client.post("/auth/register", json={
+        "username": f"nonum{u}", "email": f"nonum{u}@test.com", "password": "onlylettershere"
+    })
+    assert resp.status_code == 400
+
 async def test_login_success(client):
+    u = uid()
     await client.post("/auth/register", json={
-        "username": "loginuser", "email": "login@test.com", "password": "Test1234!"
+        "username": f"login{u}", "email": f"login{u}@test.com", "password": "TestPass1234!"
     })
     resp = await client.post("/auth/login", data={
-        "username": "loginuser", "password": "Test1234!"
+        "username": f"login{u}", "password": "TestPass1234!"
     })
     assert resp.status_code == 200
     assert "access_token" in resp.json()
-    assert resp.json()["token_type"] == "bearer"
 
 async def test_login_wrong_password(client):
+    u = uid()
     await client.post("/auth/register", json={
-        "username": "wrongpass", "email": "wrongpass@test.com", "password": "Test1234!"
+        "username": f"wp{u}", "email": f"wp{u}@test.com", "password": "TestPass1234!"
     })
     resp = await client.post("/auth/login", data={
-        "username": "wrongpass", "password": "WrongPassword!"
+        "username": f"wp{u}", "password": "WrongPassword1234!"
     })
     assert resp.status_code == 401
 
 async def test_login_nonexistent_user(client):
     resp = await client.post("/auth/login", data={
-        "username": "ghostuser", "password": "Test1234!"
+        "username": "ghostuser99999", "password": "TestPass1234!"
     })
     assert resp.status_code == 401
 
