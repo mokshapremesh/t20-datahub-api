@@ -66,7 +66,7 @@ class MatchCreate(BaseModel):
     team2: str
     venue: Optional[str] = None
     stage: Optional[str] = None
-    tournament_year: Optional[str] = Field(None, pattern=r"^\\d{4}$", examples=["2024"])
+    tournament_year: Optional[str] = Field(None, pattern=r"^\d{4}$", examples=["2024"])
     winner: Optional[str] = None
     toss_winner: Optional[str] = None
 
@@ -77,4 +77,4 @@ class MatchUpdate(BaseModel):
     stage: Optional[str] = None
     winner: Optional[str] = None
     toss_winner: Optional[str] = None
-    tournament_year: Optional[str] = Field(None, pattern=r"^\\d{4}$", examples=["2024"])
+    tournament_year: Optional[str] = Field(None, pattern=r"^\d{4}$", examples=["2024"])

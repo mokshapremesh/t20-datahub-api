@@ -148,8 +148,8 @@ async def get_squads(match_id: int, session: AsyncSession = Depends(get_session)
     )).all()
 
     player_map: dict[str, str] = {}
-    for r in bowlers: player_map[str(r.p)] = str(r.t)
-    for r in batters:  player_map[str(r.p)] = str(r.t)  # batting_team wins
+    for r in bowlers: player_map[str(r.p)] = str(r._t)
+    for r in batters:  player_map[str(r.p)] = str(r._t)  # batting_team wins
 
     by_team: dict[str, list] = {match.team1: [], match.team2: []}
     for pname, pteam in sorted(player_map.items()):
