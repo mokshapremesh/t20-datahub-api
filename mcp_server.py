@@ -57,30 +57,26 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         if name == "get_matches":
             params = {}
             if "team" in arguments: params["team"] = arguments["team"]
             if "year" in arguments: params["year"] = arguments["year"]
             r = await client.get(f"{BASE_URL}/matches", params=params)
             return [TextContent(type="text", text=r.text)]
-
         elif name == "get_scorecard":
             r = await client.get(f"{BASE_URL}/matches/{arguments['match_id']}/scorecard")
             return [TextContent(type="text", text=r.text)]
-
         elif name == "get_teams":
             params = {}
             if "year" in arguments: params["year"] = arguments["year"]
             r = await client.get(f"{BASE_URL}/options/teams", params=params)
             return [TextContent(type="text", text=r.text)]
-
         elif name == "get_fantasy_leaderboard":
             params = {}
             if "year" in arguments: params["year"] = arguments["year"]
             r = await client.get(f"{BASE_URL}/fantasy/leaderboard", params=params)
             return [TextContent(type="text", text=r.text)]
-
         return [TextContent(type="text", text="Unknown tool")]
 
 async def main():
