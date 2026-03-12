@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, and_, cast, Integer, cast, Integer
+from sqlalchemy import select, func, or_, and_, cast, Integer
 from typing import Optional
 from datetime import datetime
 from app.db.session import get_session
@@ -232,7 +232,7 @@ async def get_scorecard(
         summary = InningsSummary(runs=total_runs, wkts=total_wickets, overs=overs_str, run_rate=run_rate)
 
         # ── Fall of Wickets ───────────────────────────────────────────────────
-        fow = [FallOfWicket(**w) for w in wicket_sequence] if "fow" in include_flags or True else []
+        fow = [FallOfWicket(**w) for w in wicket_sequence] if "fow" in include_flags else []
 
         # ── Over summary (optional) ───────────────────────────────────────────
         over_summaries = None

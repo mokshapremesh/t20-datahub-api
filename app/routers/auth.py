@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +36,7 @@ async def register(body: UserRegister, session: AsyncSession = Depends(get_sessi
     return user
 
 @router.post("/login", response_model=Token)
-@limiter.limit("10/minute" if not __import__("os").getenv("TESTING") else "1000/minute")
+@limiter.limit("10/minute" if not os.getenv("TESTING") else "1000/minute")
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -62,7 +63,6 @@ async def make_admin(
     session: AsyncSession = Depends(get_session),
 ):
     """Promote yourself to admin. Requires the admin secret key."""
-    import os
     admin_secret = os.getenv("ADMIN_SECRET", "t20admin2024")
     if secret != admin_secret:
         raise HTTPException(status_code=403, detail="Invalid secret.")

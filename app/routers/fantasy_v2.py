@@ -213,19 +213,13 @@ async def create_team(
         invalid = [p for p in player_keys if p not in valid]
         if invalid:
             raise HTTPException(status_code=400, detail=f"Invalid players: {invalid}. Use GET /matches/{match_id}/squads")
-        if None and None not in player_keys:
-            raise HTTPException(status_code=400, detail="captain_key must be in player_keys.")
-        if None and None not in player_keys:
-            raise HTTPException(status_code=400, detail="vice_captain_key must be in player_keys.")
-        if None and None and None == None:
-            raise HTTPException(status_code=409, detail="captain_key and vice_captain_key must differ.")
 
     team = FantasyTeam(user_id=current_user.id, match_id=match_id, team_name=name)
     session.add(team)
     await session.flush()
 
     for i, pk in enumerate(player_keys):
-        role = "CAPTAIN" if pk == None else "VICE_CAPTAIN" if pk == None else "PLAYER"
+        role = "PLAYER"
         session.add(FantasyTeamPlayer(
             fantasy_team_id=team.id, player_name=pk,
             tournament_year=match.tournament_year or "", role=role, order=i
