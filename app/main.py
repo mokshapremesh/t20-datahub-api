@@ -3,7 +3,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi import FastAPI
-from app.routers import auth, search, matches, fantasy, profile
+from app.routers import auth, matches, profile
+from fastapi.middleware.cors import CORSMiddleware
 from app.routers.matches import admin_router as matches_admin_router
 from app.routers.profile import options_router
 from app.routers.fantasy_v2 import teams_router, lb_router, squad_router
@@ -26,13 +27,13 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(auth.router)
-app.include_router(search.router)
 app.include_router(matches.router)
 app.include_router(matches_admin_router)
-app.include_router(fantasy.router)
 app.include_router(teams_router)
 app.include_router(lb_router)
 app.include_router(squad_router)

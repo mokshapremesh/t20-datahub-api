@@ -54,3 +54,18 @@ async def login(
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.post("/make-admin")
+async def make_admin(
+    secret: str,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Promote yourself to admin. Requires the admin secret key."""
+    import os
+    admin_secret = os.getenv("ADMIN_SECRET", "t20admin2024")
+    if secret != admin_secret:
+        raise HTTPException(status_code=403, detail="Invalid secret.")
+    current_user.role = "admin"
+    await session.commit()
+    return {"message": f"{current_user.username} is now admin. Log out and back in."}

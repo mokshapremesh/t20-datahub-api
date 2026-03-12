@@ -221,7 +221,10 @@ async def get_dashboard(session: AsyncSession = Depends(get_session), current_us
         match_ids = [m.id for m in matches]
         if match_ids:
             bat   = (await session.execute(select(func.sum(Delivery.runs_total).label("runs")).where(Delivery.match_id.in_(match_ids), Delivery.batting_team == profile.fav_team))).first()
-            bowl  = (await session.execute(select(func.sum(Delivery.runs_total).label("runs")).where(Delivery.match_id.in_(match_ids), Delivery.bowling_team == profile.fav_team))).first()
+            bowl  = (await session.execute(select(
+                func.sum(Delivery.runs_total).label("runs"),
+                func.count(Delivery.id).filter(*bowler_wicket_filter()).label("wickets"),
+            ).where(Delivery.match_id.in_(match_ids), Delivery.bowling_team == profile.fav_team))).first()
             death = (await session.execute(select(func.sum(Delivery.runs_total).label("runs"), func.count(Delivery.id).filter(Delivery.is_legal == True).label("balls")).where(Delivery.match_id.in_(match_ids), Delivery.bowling_team == profile.fav_team, Delivery.over >= 16))).first()
             bat_runs    = bat.runs   or 0
             bowl_runs   = bowl.runs  or 0
@@ -243,8 +246,8 @@ async def get_dashboard(session: AsyncSession = Depends(get_session), current_us
             "stage_distribution": stage_dist,
             "year_by_year": {y: v for y, v in sorted(year_record.items())},
             "batting": {"avg_runs_scored_per_match":  round(bat_runs  / n, 1)},
-            "bowling": {"avg_runs_conceded_per_match": round(bowl_runs / n, 1),
-                        "death_overs_economy":         round(death_runs / death_balls * 6, 2)}
+            "bowling": {"avg_wickets_per_match": round((bowl.wickets or 0) / n, 1),
+                        "death_overs_economy":   round(death_runs / death_balls * 6, 2)}
         }
         result["links"]["team_matches"] = f"/matches?team={profile.fav_team}&year={profile.fav_year}"
 
@@ -281,7 +284,7 @@ async def get_dashboard(session: AsyncSession = Depends(get_session), current_us
             runs  = bat.runs  or 0
             balls = bat.balls or 1
 
-            # Best match (scoped)
+            # Best match — best batting performance
             best_bat = (await session.execute(scoped(
                 select(Delivery.match_id, func.sum(Delivery.runs_batter).label("runs"))
                 .where(Delivery.batter == resolved)
@@ -290,11 +293,44 @@ async def get_dashboard(session: AsyncSession = Depends(get_session), current_us
                 .limit(1)
             ))).first()
 
+            # Best match — best bowling performance
+            best_bowl_match = (await session.execute(scoped(
+                select(
+                    Delivery.match_id,
+                    func.count(Delivery.id).filter(*bowler_wicket_filter()).label("wickets"),
+                )
+                .where(Delivery.bowler == resolved)
+                .group_by(Delivery.match_id)
+                .order_by(func.count(Delivery.id).filter(*bowler_wicket_filter()).desc())
+                .limit(1)
+            ))).first()
+
             best_match = None
-            if best_bat:
-                m = await session.get(Match, best_bat.match_id)
+            # Pick whichever single match had the most wickets; fall back to most runs
+            chosen_mid = None
+            if best_bowl_match and (best_bowl_match.wickets or 0) > 0:
+                chosen_mid = best_bowl_match.match_id
+            elif best_bat:
+                chosen_mid = best_bat.match_id
+
+            if chosen_mid:
+                m = await session.get(Match, chosen_mid)
                 if m:
-                    best_match = {"match_id": best_bat.match_id, "label": f"{m.team1} vs {m.team2} ({m.match_date})", "runs": best_bat.runs}
+                    # Fetch both batting and bowling for that match
+                    bm_bat = (await session.execute(
+                        select(func.sum(Delivery.runs_batter).label("runs"))
+                        .where(Delivery.batter == resolved, Delivery.match_id == chosen_mid)
+                    )).first()
+                    bm_bowl = (await session.execute(
+                        select(func.count(Delivery.id).filter(*bowler_wicket_filter()).label("wickets"))
+                        .where(Delivery.bowler == resolved, Delivery.match_id == chosen_mid)
+                    )).first()
+                    best_match = {
+                        "match_id": chosen_mid,
+                        "label":    f"{m.team1} vs {m.team2} ({m.match_date})",
+                        "runs":     bm_bat.runs or 0 if bm_bat else 0,
+                        "wickets":  bm_bowl.wickets or 0 if bm_bowl else 0,
+                    }
 
             # Career WC history — all years, single query with filtered aggregates
             # runs only counted on rows where player is batter
@@ -351,6 +387,15 @@ async def get_dashboard(session: AsyncSession = Depends(get_session), current_us
 # ── Options ───────────────────────────────────────────────────────────────────
 
 options_router = APIRouter(prefix="/options", tags=["Matches"])
+
+@options_router.get("/years")
+async def get_years(session: AsyncSession = Depends(get_session)):
+    """All distinct tournament years that have match data, sorted descending."""
+    rows = (await session.execute(
+        select(Match.tournament_year).distinct().where(Match.tournament_year.isnot(None)).order_by(Match.tournament_year.desc())
+    )).scalars().all()
+    return {"years": [y for y in rows if y]}
+
 
 @options_router.get("/teams")
 async def get_teams(year: Optional[str] = Query(None), session: AsyncSession = Depends(get_session)):

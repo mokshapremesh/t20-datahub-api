@@ -148,8 +148,8 @@ async def get_squads(match_id: int, session: AsyncSession = Depends(get_session)
     )).all()
 
     player_map: dict[str, str] = {}
-    for r in bowlers: player_map[str(r.p)] = str(r._t)
-    for r in batters:  player_map[str(r.p)] = str(r._t)  # batting_team wins
+    for r in bowlers: player_map[r._mapping['p']] = r._mapping['t']
+    for r in batters:  player_map[r._mapping['p']] = r._mapping['t']  # batting_team wins
 
     by_team: dict[str, list] = {match.team1: [], match.team2: []}
     for pname, pteam in sorted(player_map.items()):
@@ -293,7 +293,7 @@ async def get_team(
     """Get your fantasy team."""
     team = (await _load_team_owned(team_id, current_user.id, session))
     if not team: raise HTTPException(status_code=404, detail="Team not found")
-    return await _to_out(team, _is_locked(team, session))
+    return await _to_out(team, _is_locked(team), session)
 
 
 @teams_router.delete("/fantasy/teams/{team_id}", status_code=204)

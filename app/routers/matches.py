@@ -41,7 +41,7 @@ async def list_matches(
     elif team:
         query = query.where(or_(Match.team1.ilike(f"%{team}%"), Match.team2.ilike(f"%{team}%")))
     if year:  query = query.where(Match.tournament_year == year)
-    if stage: query = query.where(Match.stage.ilike(f"%{stage}%"))
+    if stage: query = query.where(Match.stage == stage)
     if venue: query = query.where(Match.venue.ilike(f"%{venue}%"))
 
     matches = (await session.execute(
