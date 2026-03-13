@@ -15,4 +15,3 @@ __azurite_db_*.json
 
 # Unused deployment configs
 railway.json
-*.python-version
