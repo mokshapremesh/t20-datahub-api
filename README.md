@@ -9,7 +9,7 @@
 
 A full-stack cricket data platform for T20 World Cup matches (2014–2026). Built with **FastAPI** + **PostgreSQL** on the backend and **React 18** on the frontend, with ball-by-ball match data, a fantasy cricket system, personalised fan dashboards, and a Claude Desktop MCP integration.
 
-🌐 **Live App:** https://t20-datahub-api.onrender.com
+🌐 **Live App:** https://t20-datahub-api-1.onrender.com/
 📖 **API Docs:** https://t20-datahub-api.onrender.com/docs
 
 > Free tier on Render spins down after inactivity — first request may take 30–60 seconds.
